@@ -1,24 +1,24 @@
 import Foundation
-private let UTF8_MAX = 4
-private let UTF8_ASCCI_MAX = 0x80
+internal let UTF8_MAX = 4
+internal let UTF8_ASCCI_MAX = 0x80
 private let HUGE_WID = 1 << 30
 private let sign = "+-"
 public protocol IOReader {
     func readData(ofLength length: Int) -> Data
 }
 extension FileHandle: IOReader {}
-fileprivate protocol CharReader {
+public protocol CharReader {
     func readChar()-> Character?
 }
 
-fileprivate protocol CharScanner: CharReader {
+public protocol CharScanner: CharReader {
     func  unReadChar() throws
 }
 
 fileprivate protocol ScanState: CharScanner {
     func skipSpace()
 }
-fileprivate class stringReader: IOReader {
+internal class stringReader: IOReader {
     private var data: Data
     init(_ str: String) {
         self.data = str.data(using: .utf8)!
@@ -27,22 +27,24 @@ fileprivate class stringReader: IOReader {
         if data.count == 0 {
             return Data()
         }
-        let v = data.subdata(in: 0..<length)
-        data = data.subdata(in: length..<data.count)
+        let n = min(data.count, length)
+        let v = data.subdata(in: 0..<n)
+        data = data.subdata(in: n..<data.count)
         return v
     }
 }
 fileprivate class charReader: CharScanner {
-    let reader: IOReader
-    var buf  = [UInt8](repeating: UInt8(0), count: UTF8_MAX) // used only inside readChar
-    var pending: Int // number of bytes in pendingBuf; only > 0 for bad UTF-8
-    var pendingBuf = [UInt8](repeating: UInt8(0), count: UTF8_MAX) // bytes left over
-    var peekChar: Int64
-    static var utf8Decoder = UTF8()
+    private let reader: IOReader
+    private var buf  = [UInt8](repeating: UInt8(0), count: UTF8_MAX) // used only inside readChar
+    private var pending: Int // number of bytes in pendingBuf; only > 0 for bad UTF-8
+    private var pendingBuf = [UInt8](repeating: UInt8(0), count: UTF8_MAX) // bytes left over
+    private var peekChar: Int64
+    private var utf8Decoder: UTF8
     init(reader: IOReader) {
         self.reader = reader
         self.pending = 0
         self.peekChar = Int64(-1)
+        self.utf8Decoder = .init()
     }
     private func readByte()-> UInt8? {
         let a = reader.readData(ofLength: 1)
@@ -61,14 +63,14 @@ fileprivate class charReader: CharScanner {
             return nil
         }
         buf[0] = b
-        if buf[0] < UTF8_ASCCI_MAX {
-            peekChar = ~Int64(buf[0])
-            return Character(Unicode.Scalar(buf[0]))
+        if b < UTF8_ASCCI_MAX {
+            peekChar = ~Int64(b)
+            return Character(Unicode.Scalar(b))
         }
         var n: Int = 1
     Decode: while true {
-        var bytesIterator = Array<UInt8>(buf[0..<n]).makeIterator()
-        switch Self.utf8Decoder.decode(&bytesIterator) {
+        var bytesIterator = buf[0..<n].makeIterator()
+        switch utf8Decoder.decode(&bytesIterator) {
         case .scalarValue(let v):
             peekChar = ~Int64(v.value)
             return Character(v)
@@ -101,7 +103,11 @@ fileprivate class ss: ScanState {
     var count: Int = 0             // characters consumed so far.
     var atEOF: Bool = false        // already read EOF
     init(_ r: IOReader) {
-        self.rs = charReader(reader: r)
+        if let rr = r as? CharScanner {
+            self.rs = rr
+        } else {
+            self.rs = charReader(reader: r)
+        }
     }
     
     fileprivate func readChar()-> Character? {
