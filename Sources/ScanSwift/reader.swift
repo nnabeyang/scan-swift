@@ -54,7 +54,7 @@ public class BufferCharReader: CharScanner, IOReader {
         lastCharSize = -1
         return d
     }
-    public func readChar()-> Character? {
+    public func readChar() -> Character? {
         if !atEOF && r + UTF8_MAX > w && (w - r) < size {
             fill()
         }
@@ -62,13 +62,13 @@ public class BufferCharReader: CharScanner, IOReader {
         if r == w {
             return nil
         }
-        if buf[r] >= UTF8_ASCCI_MAX {            
+        if buf[r] >= UTF8_ASCCI_MAX {
             var bytesIterator = buf[r..<min(r + UTF8_MAX, buf.count)].makeIterator()
             switch utf8Parser.parseScalar(from: &bytesIterator) {
             case .valid(let v):
                 _ = utf8Parser.parseScalar(from: &bytesIterator)
                 let ch = Character(UTF8.decode(v))
-                r += v.count            
+                r += v.count
                 return ch
             default:
                 return nil
@@ -79,7 +79,7 @@ public class BufferCharReader: CharScanner, IOReader {
         r += 1
         return ch
     }
-    public func  unReadChar() throws {
+    public func unReadChar() throws {
         if lastCharSize < 0 || r < lastCharSize {
             throw NSError(domain: "invalid use of unReadChar", code: -1, userInfo: nil)
         }

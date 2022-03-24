@@ -1,5 +1,7 @@
 import XCTest
+
 @testable import ScanSwift
+
 func p<T>(_ x: UnsafeMutablePointer<T>) -> Any {
     return x
 }
@@ -12,7 +14,7 @@ final class scan_swiftTests: XCTestCase {
         XCTAssertEqual(a, 2345)
         XCTAssertEqual(b, 111)
     }
-    
+
     func testBufferReaderReadData() throws {
         let r = BufferCharReader(stringReader("hello, world"), size: 10)
         XCTAssertEqual("hello", String(data: r.readData(ofLength: 5), encoding: .utf8)!)
@@ -20,7 +22,7 @@ final class scan_swiftTests: XCTestCase {
         XCTAssertEqual("ld", String(data: r.readData(ofLength: 1000), encoding: .utf8)!)
         XCTAssertEqual(0, r.readData(ofLength: 1000).count)
     }
-    
+
     func testBufferCharReaderReadCharAscii() throws {
         let r = BufferCharReader(stringReader("hello"), size: 3)
         XCTAssertEqual(Character("h"), r.readChar()!)
@@ -30,7 +32,7 @@ final class scan_swiftTests: XCTestCase {
         XCTAssertEqual(Character("o"), r.readChar()!)
         XCTAssertNil(r.readChar())
     }
-    
+
     func testBufferCharReaderReadCharMultiByte() throws {
         let s = stringReader("こんにちは")
         let r = BufferCharReader(s, size: 4)
@@ -41,7 +43,7 @@ final class scan_swiftTests: XCTestCase {
         XCTAssertEqual(Character("は"), r.readChar()!)
         XCTAssertNil(r.readChar())
     }
-    
+
     func testFscanWithBufferCharReader() throws {
         var (s, a, b) = ("", 0, 0)
         let sr = stringReader("hello     2345  111")

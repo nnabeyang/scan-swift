@@ -1,4 +1,5 @@
 import Foundation
+
 internal let UTF8_MAX = 4
 internal let UTF8_ASCCI_MAX = 0x80
 private let HUGE_WID = 1 << 30
@@ -8,14 +9,14 @@ public protocol IOReader {
 }
 extension FileHandle: IOReader {}
 public protocol CharReader {
-    func readChar()-> Character?
+    func readChar() -> Character?
 }
 
 public protocol CharScanner: CharReader {
-    func  unReadChar() throws
+    func unReadChar() throws
 }
 
-fileprivate protocol ScanState: CharScanner {
+private protocol ScanState: CharScanner {
     func skipSpace()
 }
 internal class stringReader: IOReader {
@@ -33,11 +34,11 @@ internal class stringReader: IOReader {
         return v
     }
 }
-fileprivate class charReader: CharScanner {
+private class charReader: CharScanner {
     private let reader: IOReader
-    private var buf  = [UInt8](repeating: UInt8(0), count: UTF8_MAX) // used only inside readChar
-    private var pending: Int // number of bytes in pendingBuf; only > 0 for bad UTF-8
-    private var pendingBuf = [UInt8](repeating: UInt8(0), count: UTF8_MAX) // bytes left over
+    private var buf = [UInt8](repeating: UInt8(0), count: UTF8_MAX)  // used only inside readChar
+    private var pending: Int  // number of bytes in pendingBuf; only > 0 for bad UTF-8
+    private var pendingBuf = [UInt8](repeating: UInt8(0), count: UTF8_MAX)  // bytes left over
     private var peekChar: Int64
     private var utf8Decoder: UTF8
     init(reader: IOReader) {
@@ -46,14 +47,14 @@ fileprivate class charReader: CharScanner {
         self.peekChar = Int64(-1)
         self.utf8Decoder = .init()
     }
-    private func readByte()-> UInt8? {
+    private func readByte() -> UInt8? {
         let a = reader.readData(ofLength: 1)
         guard let v = a.first else {
             return nil
         }
         return v
     }
-    fileprivate func readChar()-> Character? {
+    fileprivate func readChar() -> Character? {
         if peekChar >= 0 {
             let ch = Character(Unicode.Scalar(UInt32(peekChar))!)
             peekChar = ~peekChar
@@ -68,40 +69,41 @@ fileprivate class charReader: CharScanner {
             return Character(Unicode.Scalar(b))
         }
         var n: Int = 1
-    Decode: while true {
-        var bytesIterator = buf[0..<n].makeIterator()
-        switch utf8Decoder.decode(&bytesIterator) {
-        case .scalarValue(let v):
-            peekChar = ~Int64(v.value)
-            return Character(v)
-        case .emptyInput:
-            break Decode
-        case .error:
-            guard let b = readByte() else {
-                return nil
+        Decode: while true {
+            var bytesIterator = buf[0..<n].makeIterator()
+            switch utf8Decoder.decode(&bytesIterator) {
+            case .scalarValue(let v):
+                peekChar = ~Int64(v.value)
+                return Character(v)
+            case .emptyInput:
+                break Decode
+            case .error:
+                guard let b = readByte() else {
+                    return nil
+                }
+                buf[n] = b
+                n += 1
             }
-            buf[n] = b
-            n+=1
         }
-    }
         return nil
     }
     fileprivate func unReadChar() throws {
         if peekChar >= 0 {
-            throw NSError(domain: "scanning called unreadChar with no character available", code: -1, userInfo: nil)
+            throw NSError(
+                domain: "scanning called unreadChar with no character available", code: -1, userInfo: nil)
         }
         peekChar = ~peekChar
     }
 }
 
-fileprivate func notSpace(_ ch:Character)->Bool {
+private func notSpace(_ ch: Character) -> Bool {
     return !ch.isWhitespace
 }
-fileprivate class ss: ScanState {
-    var rs: CharScanner            // where to read input
-    var buf: [Character] = []      // token accumulator
-    var count: Int = 0             // characters consumed so far.
-    var atEOF: Bool = false        // already read EOF
+private class ss: ScanState {
+    var rs: CharScanner  // where to read input
+    var buf: [Character] = []  // token accumulator
+    var count: Int = 0  // characters consumed so far.
+    var atEOF: Bool = false  // already read EOF
     init(_ r: IOReader) {
         if let rr = r as? CharScanner {
             self.rs = rr
@@ -109,17 +111,17 @@ fileprivate class ss: ScanState {
             self.rs = charReader(reader: r)
         }
     }
-    
-    fileprivate func readChar()-> Character? {
+
+    fileprivate func readChar() -> Character? {
         guard let ch = rs.readChar() else {
             atEOF = true
             return nil
         }
-        count+=1
+        count += 1
         return ch
     }
-    
-    fileprivate func  unReadChar() throws {
+
+    fileprivate func unReadChar() throws {
         try rs.unReadChar()
         atEOF = false
         count -= 1
@@ -138,8 +140,8 @@ fileprivate class ss: ScanState {
             }
         }
     }
-    
-    private func token(skipSpace: Bool, _ f: (Character) -> Bool)-> [Character] {
+
+    private func token(skipSpace: Bool, _ f: (Character) -> Bool) -> [Character] {
         if skipSpace {
             self.skipSpace()
         }
@@ -155,12 +157,12 @@ fileprivate class ss: ScanState {
         }
         return buf
     }
-    
-    private func getChar()-> Character? {
+
+    private func getChar() -> Character? {
         return readChar()
     }
-    
-    private func consume(_ ok: String, accept: Bool)-> Bool {
+
+    private func consume(_ ok: String, accept: Bool) -> Bool {
         guard let ch = getChar() else {
             return false
         }
@@ -175,34 +177,34 @@ fileprivate class ss: ScanState {
         }
         return false
     }
-    
-    private func peek(_ ok: String)-> Bool {
+
+    private func peek(_ ok: String) -> Bool {
         guard let ch = getChar() else {
             return false
         }
         try! unReadChar()
         return ok.contains(ch)
     }
-    
+
     private func notEOF() throws {
         if getChar() == nil {
             throw NSError(domain: "EOF", code: -1, userInfo: nil)
         }
         try! unReadChar()
     }
-    
-    private func accept(_ ok :String)-> Bool {
+
+    private func accept(_ ok: String) -> Bool {
         return consume(ok, accept: true)
     }
-    
-    private func scanNumber(digits: String)-> String? {
+
+    private func scanNumber(digits: String) -> String? {
         while accept(digits) {
-            
+
         }
         return String(buf)
     }
-    
-    private func scanInt()throws -> Int {
+
+    private func scanInt() throws -> Int {
         skipSpace()
         try notEOF()
         _ = accept(sign)
@@ -211,16 +213,16 @@ fileprivate class ss: ScanState {
         }
         return Int(tok)!
     }
-    
-    private func convertString()throws -> String {
+
+    private func convertString() throws -> String {
         skipSpace()
         try notEOF()
         return String(token(skipSpace: false, notSpace))
     }
-    
-    func doScan(_ args: [Any])throws -> Int {
+
+    func doScan(_ args: [Any]) throws -> Int {
         var n = 0
-        for  arg in args {
+        for arg in args {
             buf = []
             switch arg {
             case let v as UnsafeMutablePointer<Int>:
@@ -230,20 +232,20 @@ fileprivate class ss: ScanState {
             default:
                 throw NSError(domain: "unsupport type", code: -1, userInfo: nil)
             }
-            n+=1
+            n += 1
         }
         return n
     }
 }
 
-public func fscan(f: IOReader, _ a :Any...)throws -> Int {
+public func fscan(f: IOReader, _ a: Any...) throws -> Int {
     return try ss(f).doScan(a)
 }
 
-public func scan(_ a :Any...)throws -> Int {
+public func scan(_ a: Any...) throws -> Int {
     return try ss(FileHandle.standardInput).doScan(a)
 }
 
-public func sscan(content: String, _ a :Any...)throws -> Int {
+public func sscan(content: String, _ a: Any...) throws -> Int {
     return try ss(stringReader(content)).doScan(a)
 }
