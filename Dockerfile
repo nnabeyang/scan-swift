@@ -3,7 +3,7 @@ WORKDIR /build
 COPY Tools Tools
 COPY build_tools.sh .
 RUN bash build_tools.sh
-RUN find ./ -type f -name swift-format | awk '{print "cp " $1 " /usr/bin"}' | bash
+RUN install Tools/.build/release/swift-format /usr/bin
 RUN rm -rf /build
 ARG USERNAME=user
 ARG GROUPNAME=user
